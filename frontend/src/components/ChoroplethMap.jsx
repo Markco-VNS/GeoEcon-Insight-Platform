@@ -1,278 +1,70 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
-import { MapPin, Info, ArrowUpRight, ArrowDownRight, Layers, Eye } from 'lucide-react';
-import { INDICATORS, BREAKPOINTS, getFeatureColor } from '../utils/colorScales';
-import { formatRupiah, formatPercent, getQuadrantMeta } from '../utils/formatters';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapPinned, RotateCcw, Search } from 'lucide-react';
+import { formatRupiah, formatPercent } from '../utils/formatters';
 
-function MapController({ centerZoom }) {
-  const map = useMap();
-  React.useEffect(() => {
-    if (centerZoom) map.setView(centerZoom.center, centerZoom.zoom, { animate: true, duration: 0.8 });
-  }, [centerZoom, map]);
-  return null;
-}
+const VIEWS = [
+  { id: 'all', label: 'Indonesia', center: [-2.4, 118], zoom: 4.3 },
+  { id: 'Sumatera', label: 'Sumatera', center: [-0.2, 101], zoom: 5.2 },
+  { id: 'Jawa', label: 'Jawa', center: [-7.1, 110], zoom: 6 },
+  { id: 'Kalimantan', label: 'Kalimantan', center: [0.1, 114], zoom: 5.2 },
+  { id: 'Sulawesi', label: 'Sulawesi', center: [-2, 121], zoom: 5.2 },
+  { id: 'Papua', label: 'Papua', center: [-4.3, 137], zoom: 5.2 },
+];
+const QUADRANTS = { I: '#f0785b', II: '#f1b85b', III: '#59b6ae', IV: '#76bd8b' };
+function FlyTo({ view }) { const map = useMap(); useEffect(() => { if (view) map.flyTo(view.center, view.zoom, { duration: 1.1 }); }, [map, view]); return null; }
 
-export default function ChoroplethMap({ geojsonData, provinces, selectedProvince, onSelectProvince, onOpenDetail }) {
+export default function ChoroplethMap({ geojsonData, provinces = [], selectedProvince, onSelectProvince }) {
   const [indicator, setIndicator] = useState('pengeluaran_total');
-  const [centerZoom, setCenterZoom] = useState({ center: [-2.2, 118.0], zoom: 5 });
-  const [activeRegion, setActiveRegion] = useState('Semua');
-  const geoJsonRef = useRef(null);
-
-  const REGIONS = [
-    { name: 'Semua', center: [-2.2, 118.0], zoom: 5 },
-    { name: 'Sumatera', center: [0.5, 101.5], zoom: 6 },
-    { name: 'Jawa', center: [-7.2, 110.0], zoom: 7 },
-    { name: 'Kalimantan', center: [0.0, 114.0], zoom: 6 },
-    { name: 'Sulawesi', center: [-2.0, 121.5], zoom: 6 },
-    { name: 'Papua', center: [-4.2, 138.5], zoom: 6 },
-  ];
-
-  const currentIndicator = useMemo(() => INDICATORS.find(i => i.id === indicator) || INDICATORS[0], [indicator]);
-  const currentScale = BREAKPOINTS[indicator] || [];
-
-  const styleFeature = (feature) => {
-    const props = feature.properties || {};
-    const val = props[indicator];
-    const isSelected = selectedProvince && (selectedProvince.provinsi_id === props.provinsi_id || selectedProvince.provinsi === props.provinsi);
-    return {
-      fillColor: getFeatureColor(indicator, val, props.kuadran),
-      weight: isSelected ? 2.5 : 1,
-      opacity: 1,
-      color: isSelected ? '#143D30' : '#FFFFFF',
-      fillOpacity: isSelected ? 0.95 : 0.82,
-    };
+  const [view, setView] = useState(VIEWS[0]);
+  const geoRef = useRef(null);
+  const selected = selectedProvince?.provinsi_id;
+  const minMax = useMemo(() => {
+    const field = indicator === 'pengeluaran_total' ? 'pengeluaran_total' : indicator === 'persen_makanan' ? 'persen_makanan' : 'pertumbuhan_total_persen';
+    const values = provinces.map(p => Number(p[field])).filter(Number.isFinite);
+    return [Math.min(...values), Math.max(...values)];
+  }, [indicator, provinces]);
+  const color = (p) => {
+    if (indicator === 'kuadran') return QUADRANTS[p.kuadran] || '#80959b';
+    const value = Number(p[indicator === 'pengeluaran_total' ? 'pengeluaran_total' : indicator === 'persen_makanan' ? 'persen_makanan' : 'pertumbuhan_total_persen']);
+    const t = Math.max(0, Math.min(1, (value - minMax[0]) / Math.max(1, minMax[1] - minMax[0])));
+    const palette = indicator === 'persen_makanan'
+      ? ['#fff0b5', '#f6d58a', '#efad68', '#e7895a', '#d96752']
+      : ['#dcebd4', '#a8d6b9', '#74bda2', '#439d89', '#20766f'];
+    return palette[Math.min(palette.length - 1, Math.floor(t * palette.length))];
   };
-
   const onEachFeature = (feature, layer) => {
-    const props = feature.properties || {};
-    const name = props.provinsi || props.PROVINSI || '';
-    const q = getQuadrantMeta(props.kuadran);
-
-    layer.bindTooltip(`
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:160px;padding:2px">
-        <div style="font-weight:700;font-size:13px;color:#111827;margin-bottom:4px">${name}</div>
-        <div style="font-size:11px;color:#475569;line-height:1.6">
-          Total: <b style="color:#143D30">${formatRupiah(props.pengeluaran_total)}</b><br/>
-          Pangan: <b style="color:#D97706">${formatPercent(props.persen_makanan)}</b><br/>
-          <span style="display:inline-block;margin-top:3px;padding:1px 6px;border-radius:4px;background:${q.softBg};color:${q.color};font-weight:600;font-size:10px">
-            Q${props.kuadran}: ${q.title}
-          </span>
-        </div>
-      </div>
-    `, { className: 'map-tooltip', sticky: true, direction: 'top', opacity: 1 });
-
-    layer.on({
-      mouseover: (e) => {
-        e.target.setStyle({ weight: 2.5, color: '#143D30', fillOpacity: 0.95 });
-        e.target.bringToFront();
-      },
-      mouseout: (e) => { if (geoJsonRef.current) geoJsonRef.current.resetStyle(e.target); },
-      click: () => onSelectProvince?.(props.provinsi_id || props.PROVINSI),
-    });
+    const p = feature.properties || {};
+    const record = provinces.find(row => row.provinsi === p.provinsi || row.geo_name === p.PROVINSI);
+    if (!record) return;
+    layer.bindTooltip(`<b>${record.provinsi}</b><br/>Total ${formatRupiah(record.pengeluaran_total)}<br/>Porsi makanan ${formatPercent(record.persen_makanan)}<br/>Perubahan tahunan ${record.pertumbuhan_total_persen > 0 ? '+' : ''}${record.pertumbuhan_total_persen}%`, { sticky: true, className: 'atlas-tooltip' });
+    layer.on({ click: () => onSelectProvince(record.provinsi_id), mouseover: e => e.target.setStyle({ weight: 2, color: '#eff5ed', fillOpacity: .98 }), mouseout: e => geoRef.current?.resetStyle(e.target) });
   };
-
-  return (
-    <div className="card overflow-hidden isolate relative z-0">
-      {/* Controls bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-5 border-b border-surface-border">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-[16px] font-bold text-txt-primary">Peta Spasial 38 Provinsi</h2>
-            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-forest-50 text-forest-800 border border-forest-100">
-              Choropleth Interaktif
-            </span>
-          </div>
-          <p className="text-[12px] text-txt-muted mt-0.5">
-            Eksplorasi disparitas geografis belanja makanan vs non-makanan seluruh provinsi
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Region buttons */}
-          <div className="flex items-center gap-1 bg-surface-ground p-1 rounded-full border border-surface-border">
-            {REGIONS.map((r, i) => {
-              const isActive = activeRegion === r.name;
-              return (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setActiveRegion(r.name);
-                    setCenterZoom({ center: r.center, zoom: r.zoom });
-                  }}
-                  className={`px-3 py-1 rounded-full text-[12px] font-medium transition-all ${
-                    isActive 
-                      ? 'bg-forest-800 text-white shadow-soft' 
-                      : 'text-txt-secondary hover:text-forest-800 hover:bg-white'
-                  }`}
-                >
-                  {r.name}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Indicator selector */}
-          <select
-            value={indicator}
-            onChange={(e) => setIndicator(e.target.value)}
-            className="bg-white text-txt-primary text-[12px] font-medium rounded-full px-4 py-1.5 border border-surface-border shadow-soft focus:outline-none focus:ring-2 focus:ring-forest-800/20 cursor-pointer"
-          >
-            {INDICATORS.map((ind) => (
-              <option key={ind.id} value={ind.id}>{ind.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Map + Inspector Panel */}
-      <div className="flex flex-col lg:flex-row">
-        
-        {/* Map Container */}
-        <div className="flex-1 h-[500px] relative bg-[#EBF1ED] isolate z-0">
-          {geojsonData ? (
-            <MapContainer 
-              center={centerZoom.center} 
-              zoom={centerZoom.zoom} 
-              scrollWheelZoom={false} 
-              className="w-full h-full"
-            >
-              <MapController centerZoom={centerZoom} />
-              
-              {/* Clean Esri World Light Gray Base Tiles — No API Key Required, Clean & Professional */}
-              <TileLayer
-                attribution='&copy; Esri &copy; BPS Susenas 2025'
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={12} 
-                minZoom={4}
-              />
-              
-              <GeoJSON
-                key={`${indicator}-${geojsonData.features?.length}`}
-                ref={geoJsonRef}
-                data={geojsonData}
-                style={styleFeature}
-                onEachFeature={onEachFeature}
-              />
-            </MapContainer>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-txt-muted text-sm">
-              Memuat data poligon 38 provinsi...
-            </div>
-          )}
-        </div>
-
-        {/* Right Inspector Panel */}
-        <div className="w-full lg:w-[300px] border-t lg:border-t-0 lg:border-l border-surface-border p-5 space-y-5 bg-white">
-          
-          {/* Legend */}
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[11px] uppercase tracking-wider text-txt-muted font-bold">
-                Legenda Tematik
-              </span>
-              <span className="text-[10px] text-txt-muted font-medium">{currentIndicator.unit}</span>
-            </div>
-
-            <div className="space-y-1.5">
-              {indicator === 'kuadran' ? (
-                ['I', 'II', 'III', 'IV'].map(q => {
-                  const m = getQuadrantMeta(q);
-                  return (
-                    <div key={q} className="flex items-center gap-2.5 text-[11px]">
-                      <span className="w-3.5 h-3.5 rounded-md shrink-0 shadow-sm" style={{ backgroundColor: m.color }} />
-                      <span className="text-txt-primary font-medium">Q{q}: {m.title}</span>
-                    </div>
-                  );
-                })
-              ) : (
-                currentScale.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2.5 text-[11px]">
-                    <span className="w-3.5 h-3.5 rounded-md shrink-0 shadow-sm" style={{ backgroundColor: s.color }} />
-                    <span className="text-txt-secondary font-medium">{s.label}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Selected Province Quick Inspector */}
-          {selectedProvince ? (
-            <div className="pt-4 border-t border-surface-border space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] text-txt-muted font-semibold uppercase tracking-wider block">
-                    Wilayah Terpilih
-                  </span>
-                  <h4 className="text-[15px] font-bold text-txt-primary mt-0.5">
-                    {selectedProvince.provinsi}
-                  </h4>
-                </div>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${getQuadrantMeta(selectedProvince.kuadran).bg}`}>
-                  Q{selectedProvince.kuadran}
-                </span>
-              </div>
-
-              {/* Mini Stats Box */}
-              <div className="bg-surface-ground p-3 rounded-xl space-y-2 border border-surface-border">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-[11px] text-txt-muted">Pengeluaran Total</span>
-                  <span className="text-[13px] text-forest-800 font-extrabold font-sans">
-                    {formatRupiah(selectedProvince.pengeluaran_total)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-baseline text-[11px]">
-                  <span className="text-txt-muted">Pangan ({formatPercent(selectedProvince.persen_makanan)})</span>
-                  <span className="text-txt-secondary font-semibold">
-                    {formatRupiah(selectedProvince.pengeluaran_makanan)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-baseline text-[11px]">
-                  <span className="text-txt-muted">Non-Makanan ({formatPercent(selectedProvince.persen_non_makanan)})</span>
-                  <span className="text-txt-secondary font-semibold">
-                    {formatRupiah(selectedProvince.pengeluaran_non_makanan)}
-                  </span>
-                </div>
-
-                {/* Progress ratio */}
-                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden flex mt-1">
-                  <div style={{ width: `${selectedProvince.persen_makanan}%` }} className="bg-amber-500" />
-                  <div style={{ width: `${selectedProvince.persen_non_makanan}%` }} className="bg-forest-700" />
-                </div>
-              </div>
-
-              {/* Deviasi vs Median */}
-              <div className="flex items-center justify-between text-[11px] px-1">
-                <span className="text-txt-muted">Deviasi Median:</span>
-                <span className={`font-bold ${selectedProvince.deviasi_median_total_rp >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                  {selectedProvince.deviasi_median_total_rp >= 0 ? '+' : ''}{formatRupiah(selectedProvince.deviasi_median_total_rp)}
-                </span>
-              </div>
-
-              {/* Action Button */}
-              {onOpenDetail && (
-                <button
-                  onClick={() => onOpenDetail(selectedProvince.provinsi_id)}
-                  className="w-full mt-2 py-2 px-3 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-[12px] font-semibold transition-all shadow-soft flex items-center justify-center gap-1.5"
-                >
-                  <Eye className="w-3.5 h-3.5 text-mint-300" />
-                  <span>Lihat Lembar Analisis</span>
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="pt-4 border-t border-surface-border text-center py-6">
-              <div className="w-10 h-10 rounded-full bg-forest-50 text-forest-800 flex items-center justify-center mx-auto mb-2">
-                <MapPin className="w-5 h-5" />
-              </div>
-              <p className="text-[12px] text-txt-muted font-medium">
-                Klik salah satu provinsi di peta untuk menganalisis metriknya
-              </p>
-            </div>
-          )}
-
-        </div>
-
-      </div>
+  const style = feature => {
+    const record = provinces.find(row => row.provinsi === feature.properties?.provinsi || row.geo_name === feature.properties?.PROVINSI);
+    return { fillColor: record ? color(record) : '#42555a', fillOpacity: record?.provinsi_id === selected ? .98 : .82,
+      color: record?.provinsi_id === selected ? '#f9d66b' : '#d8e6dc', weight: record?.provinsi_id === selected ? 2.4 : .8, opacity: .9 };
+  };
+  const rankField = indicator === 'kuadran' ? 'pengeluaran_total' : indicator;
+  const mapRows = [...provinces].sort((a,b) => b[rankField] - a[rankField]).slice(0, 5);
+  return <section className="atlas-card" id="map">
+    <div className="atlas-heading"><div><span className="eyebrow">02 / INTELIJEN SPASIAL</span><h2>Peta pola konsumsi</h2><p>Jelajahi perbedaan pengeluaran, porsi pangan, dan perubahan nominal antarprovinsi.</p></div><span className="live-chip"><i /> 38 provinsi</span></div>
+    <div className="map-toolbar">
+      <div className="region-pills">{VIEWS.map(v => <button key={v.id} onClick={() => setView(v)} className={view.id === v.id ? 'active' : ''}>{v.label}</button>)}</div>
+      <label className="map-select"><MapPinned size={16}/><select value={indicator} onChange={e => setIndicator(e.target.value)}><option value="pengeluaran_total">Pengeluaran total 2025</option><option value="persen_makanan">Porsi pengeluaran makanan</option><option value="pertumbuhan_total_persen">Perubahan total 2024–25</option><option value="kuadran">Kelompok konsumsi</option></select></label>
     </div>
-  );
+    <div className="map-layout">
+      <div className="map-canvas">
+        {geojsonData && <MapContainer center={view.center} zoom={view.zoom} scrollWheelZoom={false} zoomControl className="thematic-map"><FlyTo view={view}/><TileLayer attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ' url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}" maxZoom={16}/><GeoJSON key={indicator} data={geojsonData} ref={geoRef} style={style} onEachFeature={onEachFeature}/></MapContainer>}
+        <div className="map-overlay-title"><span>INDONESIA</span><small>Susenas • 2025</small></div>
+        <div className="map-legend"><span>Rendah</span><i/><i/><i/><i/><span>Tinggi</span></div>
+        <button className="map-reset" title="Kembali ke seluruh Indonesia" onClick={() => setView(VIEWS[0])}><RotateCcw size={16}/></button>
+      </div>
+      <aside className="map-insights"><div className="map-insights-label"><span>URUTAN TERTINGGI</span><Search size={15}/></div><div className="map-insights-title">Lima provinsi teratas</div>
+        {mapRows.map((p,i) => <button className={`map-rank ${p.provinsi_id === selected ? 'chosen' : ''}`} key={p.provinsi_id} onClick={() => onSelectProvince(p.provinsi_id)}><b>{String(i+1).padStart(2,'0')}</b><span>{p.provinsi}<small>{formatRupiah(p.pengeluaran_total)} / kapita / bulan</small></span><i style={{background: p.kuadran ? QUADRANTS[p.kuadran] : '#6cbaa9'}}/></button>)}
+        <div className="map-selected">{selectedProvince ? <><span>PROVINSI DIPILIH</span><strong>{selectedProvince.provinsi}</strong><p>{selectedProvince.kategori_wilayah} · Q{selectedProvince.kuadran}</p></> : <p>Pilih provinsi di peta atau daftar untuk melihat pola konsumsi.</p>}</div>
+        <small className="map-note">Peta menggunakan poligon administratif provinsi. Nilai indikator diturunkan dari CSV yang disediakan.</small>
+      </aside>
+    </div>
+  </section>;
 }

@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 
 # Ensure parent and root dirs are in sys.path so imports work regardless of launch directory
 _current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,8 +35,8 @@ except ImportError:
 
 app = FastAPI(
     title="GeoEcon Insight API",
-    description="Geodata Economic Intelligence Platform - Analisis Ketimpangan Konsumsi & Pola Belanja Susenas BPS 2025",
-    version="1.0.0",
+    description="Analisis pengeluaran konsumsi antarprovinsi dari CSV Susenas/BPS 2024–2025",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -53,35 +52,21 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    # Save clean json dump for static reference
-    clean_json_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "data",
-        "susenas_2025_clean.json"
-    )
-    with open(clean_json_path, "w", encoding="utf-8") as f:
-        json.dump(data_engine.provinces_data, f, indent=2, ensure_ascii=False)
-    print(f"[GeoEcon Insight] Initialized successfully with {len(data_engine.provinces_data)} provinces.")
+    print(f"[GeoEcon Insight] Loaded {len(data_engine.provinces_data)} provinces from CSV datasets.")
 
 @app.get("/api/health")
 def get_health():
     return {
         "status": "healthy",
         "service": "GeoEcon Insight Backend API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "provinces_loaded": len(data_engine.provinces_data),
-        "data_source": "BPS Susenas 2025 (Pengeluaran per Kapita Makanan & Bukan Makanan)"
+        "data_source": "CSV Susenas/BPS 2024–2025 (pengeluaran dan komposisi konsumsi)"
     }
 
 @app.get("/api/summary", response_model=SummaryMetrics)
 def get_summary():
-    """
-    Mengembalikan ringkasan metrik agregat nasional:
-    - Median Pengeluaran Total: Rp 1.495.638
-    - Median Proporsi Pangan: 51.21%
-    - Nilai ekstrem (DKI Jakarta & NTT)
-    - Rasio disparitas & korelasi Hukum Engel (r = -0.576)
-    """
+    """Mengembalikan ringkasan yang dihitung dari tiga CSV Susenas."""
     return data_engine.summary_metrics
 
 @app.get("/api/provinces", response_model=List[ProvinceData])
@@ -103,7 +88,7 @@ def get_provinces(
         results = [p for p in results if p.get("pulau", "").lower() == pulau.lower()]
         
     reverse = (order.lower() == "desc")
-    if sort_by in ["pengeluaran_total", "pengeluaran_makanan", "pengeluaran_non_makanan", "persen_makanan", "persen_non_makanan"]:
+    if sort_by in ["pengeluaran_total", "pengeluaran_makanan", "pengeluaran_non_makanan", "persen_makanan", "persen_non_makanan", "pertumbuhan_total_persen", "pertumbuhan_makanan_persen", "pertumbuhan_non_makanan_persen"]:
         results.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
     elif sort_by == "provinsi":
         results.sort(key=lambda x: x.get("provinsi", ""), reverse=reverse)

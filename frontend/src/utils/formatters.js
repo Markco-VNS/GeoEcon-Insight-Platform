@@ -23,36 +23,36 @@ export const formatPercent = (value, decimals = 2) => {
 const Q_META = {
   I: {
     label: 'Kuadran I',
-    title: 'Rawan Rentan',
-    color: '#E11D48', // Soft Rose
-    softBg: '#FFF1F2',
+    title: 'Rentan konsumsi',
+    color: '#CE6C54',
+    softBg: '#FAECE5',
     border: '#FFE4E6',
     bg: 'bg-rose-50 text-rose-700 border border-rose-200/60',
     badge: 'bg-rose-100/80 text-rose-800'
   },
   II: {
     label: 'Kuadran II',
-    title: 'Anomali Logistik 3TP',
-    color: '#D97706', // Warm Amber
-    softBg: '#FFFBEB',
+    title: 'Tekanan pangan tinggi',
+    color: '#C8973D',
+    softBg: '#F8F0DE',
     border: '#FDE68A',
     bg: 'bg-amber-50 text-amber-800 border border-amber-200/60',
     badge: 'bg-amber-100/80 text-amber-800'
   },
   III: {
     label: 'Kuadran III',
-    title: 'Transisi Berkembang',
-    color: '#0D9488', // Soft Teal
-    softBg: '#F0FDFA',
+    title: 'Transisi konsumsi',
+    color: '#4F9A91',
+    softBg: '#E8F3EF',
     border: '#CCFBF1',
     bg: 'bg-teal-50 text-teal-800 border border-teal-200/60',
     badge: 'bg-teal-100/80 text-teal-800'
   },
   IV: {
     label: 'Kuadran IV',
-    title: 'Mature Urban',
-    color: '#15803D', // Forest Emerald
-    softBg: '#ECFDF5',
+    title: 'Konsumsi non-pangan besar',
+    color: '#6F9A70',
+    softBg: '#EAF1E5',
     border: '#A7F3D0',
     bg: 'bg-emerald-50 text-emerald-800 border border-emerald-200/60',
     badge: 'bg-emerald-100/80 text-emerald-800'

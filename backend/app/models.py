@@ -25,6 +25,13 @@ class ProvinceData(BaseModel):
     engel_residual: Optional[float] = None
     sektor_prioritas: Optional[List[str]] = None
     rekomendasi_kebijakan: Optional[List[str]] = None
+    pengeluaran_makanan_2024: Optional[int] = None
+    pengeluaran_non_makanan_2024: Optional[int] = None
+    pengeluaran_total_2024: Optional[int] = None
+    pertumbuhan_total_persen: Optional[float] = None
+    pertumbuhan_makanan_persen: Optional[float] = None
+    pertumbuhan_non_makanan_persen: Optional[float] = None
+    perubahan_porsi_makanan_pp: Optional[float] = None
 
 class SummaryMetrics(BaseModel):
     total_provinsi: int
@@ -43,6 +50,13 @@ class SummaryMetrics(BaseModel):
     regresi_slope: float
     regresi_intercept: float
     nasional_susenas: Dict[str, Any]
+    perubahan_nasional_total_persen: Optional[float] = None
+    perubahan_nasional_pangan_persen: Optional[float] = None
+    perubahan_nasional_non_pangan_persen: Optional[float] = None
+    perubahan_nasional_porsi_pangan_pp: Optional[float] = None
+    nasional_2024: Optional[Dict[str, Any]] = None
+    periode: Optional[str] = None
+    sumber_data: Optional[str] = None
 
 class QuadrantSummary(BaseModel):
     kuadran: str

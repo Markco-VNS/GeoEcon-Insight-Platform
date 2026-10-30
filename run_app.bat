@@ -1,33 +1,51 @@
 @echo off
-title GeoEcon Insight Runner
-echo ========================================================
-echo   GEODATA ECONOMIC INTELLIGENCE PLATFORM (GeoEcon Insight)
-echo ========================================================
-echo.
-echo Menjalankan Backend (FastAPI) dan Frontend (Vite)...
-echo.
-
-:: Pindah ke direktori tempat file bat berada
+setlocal
+title GeoEcon Insight
 cd /d "%~dp0"
 
-:: Jalankan Backend di jendela cmd terpisah
-start "GeoEcon Backend (FastAPI)" cmd /k "cd backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
-
-:: Tunggu 3 detik
-ping 127.0.0.1 -n 3 >nul
-
-:: Jalankan Frontend di jendela cmd terpisah
-start "GeoEcon Frontend (Vite)" cmd /k "cd frontend && npm run dev"
-
-:: Tunggu 3 detik
-ping 127.0.0.1 -n 3 >nul
-
-:: Buka browser secara otomatis
-start http://localhost:5173
-
+echo Starting GeoEcon Insight...
 echo.
-echo [OK] Backend aktif di:  http://127.0.0.1:8000
-echo [OK] Frontend aktif di: http://localhost:5173
+
+where py >nul 2>nul
+if not errorlevel 1 goto python_ok
+python --version >nul 2>nul
+if not errorlevel 1 goto python_ok
+if exist "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" goto python_ok
+
+echo ERROR: Python 3 was not found.
+echo Install Python 3.10 or newer, then run this file again.
+echo During installation, enable "Add Python to PATH".
 echo.
-echo Browser telah dibuka otomatis. Jendela ini dapat ditutup.
 pause
+exit /b 1
+
+:python_ok
+where node >nul 2>nul
+if errorlevel 1 (
+  echo ERROR: Node.js was not found. Install Node.js 18 or newer.
+  pause
+  exit /b 1
+)
+
+if not exist "frontend\node_modules" (
+  echo Installing frontend dependencies...
+  call npm --prefix frontend install
+  if errorlevel 1 goto failed
+)
+
+start "GeoEcon Backend" /D "%~dp0backend" cmd /k call run_backend.bat
+timeout /t 2 /nobreak >nul
+start "GeoEcon Frontend" /D "%~dp0frontend" cmd /k npm.cmd run dev
+timeout /t 3 /nobreak >nul
+start "" "http://localhost:5173"
+
+echo.
+echo Frontend: http://localhost:5173
+echo Backend:  http://127.0.0.1:8000/docs
+exit /b 0
+
+:failed
+echo.
+echo Startup failed. Check the error above.
+pause
+exit /b 1

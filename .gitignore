@@ -20,6 +20,7 @@ __pycache__/
 env/
 venv/
 .venv/
+backend/.runtime-packages/
 ENV/
 build/
 develop-eggs/
